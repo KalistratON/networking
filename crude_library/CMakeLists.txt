@@ -1,15 +1,15 @@
-project(select_base_proccesing)
+project(crude_library)
 
-file(GLOB select_base_proccesing_filepath "${CMAKE_CURRENT_SOURCE_DIR}/*/*")
+file(GLOB crude_library_filepath "${CMAKE_CURRENT_SOURCE_DIR}/*/*")
 
-add_library(select_base_proccesing SHARED ${select_base_proccesing_filepath})
+add_library(crude_library SHARED ${crude_library_filepath})
 
-target_include_directories (select_base_proccesing PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+target_include_directories (crude_library PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
 if(MSVC)
-  target_compile_options(select_base_proccesing PRIVATE /W4 /WX)
+  target_compile_options(crude_library PRIVATE /W4 /WX)
 else()
-  target_compile_options(select_base_proccesing PRIVATE -Werror)
+  target_compile_options(crude_library PRIVATE -Werror)
 endif()
 
 
