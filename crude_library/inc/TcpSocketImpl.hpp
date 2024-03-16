@@ -23,14 +23,9 @@ public:
     SocketType Accept ();
     SocketType Accept (sockaddr_in& theServerInfo);
     
-    bool Read  (const std::shared_ptr<TcpSocketImpl>& theSocket, char* theData, 
-                std::uint64_t theMaxDataSize);
-    bool Write (const std::shared_ptr<TcpSocketImpl>& theSocket, const char* theData, 
-                std::uint64_t theDataSize);
+    bool Read  (char* theData, std::uint64_t theMaxDataSize);
+    bool Write (const char* theData, std::uint64_t theDataSize);
     void Close();
-
-
-    friend TcpServerImpl;
 };
 
 }

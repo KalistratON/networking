@@ -4,6 +4,8 @@ file(GLOB crude_library_filepath "${CMAKE_CURRENT_SOURCE_DIR}/*/*")
 
 add_library(crude_library SHARED ${crude_library_filepath})
 
+target_link_libraries (crude_library PUBLIC event_system)
+
 target_include_directories (crude_library PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
 if(MSVC)

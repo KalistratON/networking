@@ -5,8 +5,6 @@
 #include <WinSock2.h>
 #endif
 
-namespace networking {
-
 #ifndef _NETWORKING_EXPORT
 #ifdef _WIN32
 #define _NETWORKING_EXPORT __declspec(dllexport)
@@ -20,6 +18,5 @@ using SocketType = int;
 #elif _WIN32
 using SocketType = SOCKET;
 #endif
-}
 
 #endif

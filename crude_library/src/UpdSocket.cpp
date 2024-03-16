@@ -1,5 +1,6 @@
 #include "../inc/UpdSocket.hpp"
 #include "../inc/UpdSocketImpl.hpp"
+#include "../inc/Helper.hpp"
 
 #ifdef __linux__
 #include <arpa/inet.h>
@@ -41,11 +42,12 @@ bool internal::UpdSocketImpl::Bind (const char* theReciverAddress, std::uint16_t
     }
 #endif
     mySocket = socket (AF_INET, SOCK_DGRAM, 0);
+#ifdef _WIN32
     if (mySocket == INVALID_SOCKET) {
         ErrorProcessing (__LINE__, __FILE__);
         return false;
     }
-
+#endif
     sockaddr_in aSocketInfo;
     in_addr ip_to_num;
     inet_pton (AF_INET, theReciverAddress, &ip_to_num);
@@ -55,7 +57,7 @@ bool internal::UpdSocketImpl::Bind (const char* theReciverAddress, std::uint16_t
     aSocketInfo.sin_port = htons (thePort);
 
     int aBindReturn = bind (mySocket, reinterpret_cast <const sockaddr*> (&aSocketInfo), sizeof (aSocketInfo));
-    if (aBindReturn <= 0) {
+    if (aBindReturn != 0) {
         ErrorProcessing (__LINE__, __FILE__);
     }
     return aBindReturn;
@@ -65,17 +67,17 @@ bool internal::UpdSocketImpl::ReadDatagram (char* theData, std::uint64_t theMaxD
 {
     int aRecvReturn = recvfrom (mySocket, theData, static_cast <int> (theMaxDataSize), 0, 
                                 nullptr, nullptr);
+#ifdef _WIN32
     if (aRecvReturn == SOCKET_ERROR) {
         ErrorProcessing(__LINE__, __FILE__);
-#ifdef _WIN32
         if (aRecvReturn == WSAENETDOWN
             || aRecvReturn == WSAENOTCONN
             || aRecvReturn == WSAENOTSOCK
             || aRecvReturn == WSAETIMEDOUT) {
         }
         return false;
-#endif
     }
+#endif
     return true;
 }
 
@@ -85,17 +87,17 @@ bool internal::UpdSocketImpl::ReadDatagram (char* theData, std::uint64_t theMaxD
     int aSenderInfoSize = sizeof (theSenderInfo);
     int aRecvReturn = recvfrom (mySocket, theData, static_cast <int> (theMaxDataSize), 0,
                                 (sockaddr*) (&theSenderInfo), &aSenderInfoSize);
+#ifdef _WIN32
     if (aRecvReturn == SOCKET_ERROR) {
         ErrorProcessing(__LINE__, __FILE__);
-#ifdef _WIN32
         if (aRecvReturn == WSAENETDOWN
             || aRecvReturn == WSAENOTCONN
             || aRecvReturn == WSAENOTSOCK
             || aRecvReturn == WSAETIMEDOUT) {
         }
         return false;
-#endif
     }
+#endif
     return true;
 }
 
@@ -112,43 +114,43 @@ bool internal::UpdSocketImpl::WriteDatagram (const char* theData, std::uint64_t 
 
     int aRecvReturn = sendto (mySocket, theData, static_cast <int> (theDataSize), 0,
                               reinterpret_cast <sockaddr*> (&aSocketInfo), sizeof (aSocketInfo));
+#ifdef _WIN32
     if (aRecvReturn == SOCKET_ERROR) {
         ErrorProcessing(__LINE__, __FILE__);
-#ifdef _WIN32
         if (aRecvReturn == WSAENETDOWN
             || aRecvReturn == WSAENOTCONN
             || aRecvReturn == WSAENOTSOCK
             || aRecvReturn == WSAETIMEDOUT) {
             return false;
         }
-#endif
     }
+#endif
     return true;
 }
 
 UpdSocket::UpdSocket (SocketType theSocket) :
-    AbstractSocket(theSocket),
-    myImpl(std::make_shared<internal::UpdSocketImpl>(theSocket))
+    AbstractSocket (std::make_shared <internal::UpdSocketImpl> (theSocket))
 {};
 
 bool UpdSocket::Bind (const char* theReciverAddress, std::uint16_t thePort)
 {
-    return myImpl->Bind (theReciverAddress, thePort);
+    return internal::ToImpl<internal::UpdSocketImpl> (myImpl)->Bind (theReciverAddress, thePort);
 }
 
 bool UpdSocket::ReadDatagram (char* theData, std::uint64_t theMaxDataSize)
 {
-    return myImpl->ReadDatagram (theData, theMaxDataSize);
+    return internal::ToImpl<internal::UpdSocketImpl> (myImpl)->ReadDatagram (theData, theMaxDataSize);
 }
 
 bool UpdSocket::ReadDatagram (char* theData, std::uint64_t theMaxDataSize, sockaddr_in& theSenderInfo)
 {
-    return myImpl->ReadDatagram (theData, theMaxDataSize, theSenderInfo);
+    return internal::ToImpl<internal::UpdSocketImpl> (myImpl)->ReadDatagram (theData, theMaxDataSize, theSenderInfo);
 }
 
 bool UpdSocket::WriteDatagram (const char* theData, std::uint64_t theDataSize, 
                                const char* theReciverAddress, std::uint16_t thePort)
 {
-    return myImpl->WriteDatagram (theData, theDataSize, theReciverAddress, thePort);
+    return internal::ToImpl<internal::UpdSocketImpl> (myImpl)->WriteDatagram (theData, theDataSize, 
+                                                                              theReciverAddress, thePort);
 }
 

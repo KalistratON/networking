@@ -5,6 +5,7 @@
 
 #include <memory>
 
+// used both in Windows and Linux
 struct sockaddr_in;
 
 namespace networking {
@@ -13,7 +14,8 @@ namespace internal {
     class UpdSocketImpl;
 }
 
-class UpdSocket : AbstractSocket {
+class UpdSocket : public AbstractSocket {
+
 public:
     _NETWORKING_EXPORT UpdSocket (SocketType theSocket = -1);
 
@@ -25,9 +27,6 @@ public:
     _NETWORKING_EXPORT bool WriteDatagram (const char* theData, std::uint64_t theDataSize,
                                            const char* theReciverAddress = "127.0.0.1", 
                                            std::uint16_t thePort = 1);
-
-private:
-    std::shared_ptr <internal::UpdSocketImpl> myImpl;
 };
 }
 

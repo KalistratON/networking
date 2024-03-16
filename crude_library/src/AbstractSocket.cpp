@@ -18,6 +18,31 @@ internal::AbstractSocketImpl::AbstractSocketImpl (SocketType theSocket) :
     mySocket (theSocket)
 {};
 
-AbstractSocket::AbstractSocket (SocketType theSocket) :
-    myImpl (std::make_shared<internal::AbstractSocketImpl>(theSocket))
+SocketType internal::AbstractSocketImpl::GetSocket() const
+{
+    return mySocket;
+};
+
+AbstractSocket::AbstractSocket (const ImplPtr& theImplPtr) :
+    myImpl (theImplPtr)
 {};
+
+SocketType AbstractSocket::GetSocket() const
+{
+    return myImpl->GetSocket();
+};
+
+AbstractSocket::operator bool() const
+{
+    return GetSocket() != -1;
+}
+
+bool AbstractSocket::operator == (const AbstractSocket& theCmp) const
+{
+    return GetSocket() == theCmp.GetSocket();
+}
+
+bool AbstractSocket::operator != (const AbstractSocket& theCmp) const
+{
+    return GetSocket() != theCmp.GetSocket();
+}

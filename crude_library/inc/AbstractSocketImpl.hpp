@@ -10,8 +10,9 @@ class AbstractSocketImpl {
 
 public:
     AbstractSocketImpl (SocketType theSocket);
+    SocketType GetSocket () const;
 
-protected:
+public:
     SocketType mySocket;
 };
 

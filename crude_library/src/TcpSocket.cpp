@@ -1,5 +1,6 @@
-#include "../inc/TcpSocket.hpp"
+﻿#include "../inc/TcpSocket.hpp"
 #include "../inc/TcpSocketImpl.hpp"
+#include "../inc/Helper.hpp"
 
 #ifdef _WIN32
 #include <WinSock2.h>
@@ -16,18 +17,37 @@
 
 using namespace networking;
 
+// from https://stepik.org/lesson/12579/step/1?unit=3005
+static int set_nonblock (SocketType fd)
+{
+#ifdef _WIN32
+    ULONG flags;
+#elif __linux__
+    int flags;
+#endif
+#if defined(O_NONBLOCK)
+    ﻿if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
+        ﻿flags = 0;
+    ﻿return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#else
+    flags = 1;
+    return ioctlsocket (fd, FIONBIO, & flags);
+#endif
+} 
+
 static void ErrorProcessing (int theLine, const char* theFile)
 {
 #ifdef _WIN32
-        std::cerr << "Error! | " 
-                  << "LINE : " << theLine << " : FILE : "  << theFile 
-                  << WSAGetLastError();
+    std::cerr << "Error! | " 
+                << "LINE : " << theLine << " : FILE : "  << theFile 
+                << "Error Code : " << WSAGetLastError();
 #endif
 }
 
-internal::TcpSocketImpl::TcpSocketImpl (SocketType theSocket) :
-    AbstractSocketImpl(theSocket)
-{};
+internal::TcpSocketImpl::TcpSocketImpl (SocketType theSocket) : AbstractSocketImpl (theSocket)
+{
+    set_nonblock (theSocket);
+};
 
 bool internal::TcpSocketImpl::Bind (const char* theReciverAddress, std::uint16_t thePort)
 {
@@ -41,11 +61,13 @@ bool internal::TcpSocketImpl::Bind (const char* theReciverAddress, std::uint16_t
 #endif
     
     mySocket = socket (AF_INET, SOCK_STREAM, 0);
+#ifdef _WIN32
     if (mySocket == INVALID_SOCKET) {
         ErrorProcessing (__LINE__, __FILE__);
         return false;
     }
-
+#endif
+    set_nonblock (mySocket);
     sockaddr_in aSocketInfo;
     {
         in_addr ip_to_num;
@@ -59,52 +81,87 @@ bool internal::TcpSocketImpl::Bind (const char* theReciverAddress, std::uint16_t
     }
     int aBindReturn = bind (mySocket, reinterpret_cast <const sockaddr*> (&aSocketInfo), 
                              sizeof (aSocketInfo));
-    if (aBindReturn <= 0) {
+    if (aBindReturn != 0) {
         ErrorProcessing (__LINE__, __FILE__);
     }
     return aBindReturn;
 }
 
-bool internal::TcpSocketImpl::Listen ()
+bool internal::TcpSocketImpl::Listen()
 {
+#ifdef _WIN32
     if (listen (mySocket, SOMAXCONN) == SOCKET_ERROR) {
         ErrorProcessing (__LINE__, __FILE__);
         return false;
     }
+#elif __linux__
+    if (listen (mySocket, SOMAXCONN) == -1) {
+        ErrorProcessing (__LINE__, __FILE__);
+        return false;
+    }
+#endif
     return true;
 }
 
 SocketType internal::TcpSocketImpl::Accept()
 {
     const auto& aClientSocket = accept (mySocket, nullptr, nullptr);
+#ifdef _WIN32
+    if (aClientSocket == INVALID_SOCKET) {
+        ErrorProcessing (__LINE__, __FILE__);
+    }
+#endif
+    set_nonblock (aClientSocket);
     return aClientSocket;
 }
 
 SocketType internal::TcpSocketImpl::Accept (sockaddr_in& theServerInfo)
 {
     int aSenderInfoSize = sizeof (theServerInfo);
-    const auto& aClientSocket = accept (mySocket, (sockaddr*) &theServerInfo, &aSenderInfoSize); // make socket here
+    const auto& aClientSocket = accept (mySocket, (sockaddr*) &theServerInfo, &aSenderInfoSize);
+#ifdef _WIN32
+    if (aClientSocket == INVALID_SOCKET) {
+        ErrorProcessing (__LINE__, __FILE__);
+    }
+#endif
+    set_nonblock (aClientSocket);
     return aClientSocket;
 }
 
 bool internal::TcpSocketImpl::Connect (const sockaddr_in& theServerInfo)
 {
-    return connect (mySocket, (sockaddr*) &theServerInfo, sizeof (theServerInfo));
+    int aConnectReturn = connect (mySocket, (sockaddr*) &theServerInfo, sizeof (theServerInfo));
+#ifdef _WIN32
+    if (aConnectReturn == SOCKET_ERROR) {
+        ErrorProcessing (__LINE__, __FILE__);
+        return false;
+    }
+#endif
+    return true;
 }
 
 void internal::TcpSocketImpl::Close()
 {
-    shutdown (mySocket, SD_BOTH);
-    closesocket (mySocket);
+    int aSDReturn = shutdown (mySocket, SD_BOTH);
+#ifdef _WIN32
+    if (aSDReturn == SOCKET_ERROR) {
+        ErrorProcessing (__LINE__, __FILE__);
+    }
+#endif
+    int aCSReturn = closesocket (mySocket);
+#ifdef _WIN32
+    if (aCSReturn == SOCKET_ERROR) {
+        ErrorProcessing (__LINE__, __FILE__);
+    }
+#endif
 }
 
-bool internal::TcpSocketImpl::Read (const std::shared_ptr<TcpSocketImpl>& theSocket, 
-                                    char* theData, std::uint64_t theMaxDataSize)
+bool internal::TcpSocketImpl::Read (char* theData, std::uint64_t theMaxDataSize)
 {
-    int aRecvReturn = recv (theSocket->mySocket, theData, static_cast <int> (theMaxDataSize), 0);
+    int aRecvReturn = recv (mySocket, theData, static_cast <int> (theMaxDataSize), 0);
+#ifdef _WIN32
     if (aRecvReturn == SOCKET_ERROR) {
         ErrorProcessing(__LINE__, __FILE__);
-#ifdef _WIN32
         if (aRecvReturn == WSAENETDOWN
             || aRecvReturn == WSAENOTCONN
             || aRecvReturn == WSAENOTSOCK
@@ -112,61 +169,66 @@ bool internal::TcpSocketImpl::Read (const std::shared_ptr<TcpSocketImpl>& theSoc
             Close();
         }
         return false;
-#endif
     }
+#endif
     return true;
 }
 
-bool internal::TcpSocketImpl::Write (const std::shared_ptr<TcpSocketImpl>& theSocket, 
-                                     const char* theData, std::uint64_t theDataSize)
+bool internal::TcpSocketImpl::Write (const char* theData, std::uint64_t theDataSize)
 {
-    return send (theSocket->mySocket, theData, static_cast<int> (theDataSize), 0);
+    int Retnd = send (mySocket, theData, static_cast<int> (theDataSize), 0);
+#ifdef _WIN32
+    if (Retnd == SOCKET_ERROR) {
+        ErrorProcessing(__LINE__, __FILE__);
+        return false;
+    }
+#endif
+    return true;
 }
 
-TcpSocket::TcpSocket (SocketType theSocket) :
-    AbstractSocket (theSocket),
-    myImpl(std::make_shared<internal::TcpSocketImpl> (theSocket))
+TcpSocket::TcpSocket (SocketType theSocket) : 
+    AbstractSocket (std::make_shared <internal::TcpSocketImpl> (theSocket))
 {};
 
 bool TcpSocket::Bind (const char* theReciverAddress, std::uint16_t thePort)
 {
-    return myImpl->Bind (theReciverAddress, thePort);
+    return internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Bind (theReciverAddress, thePort);
 }
 
 bool TcpSocket::Listen()
 {
-    return myImpl->Listen();
+    return internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Listen();
 }
 
 std::shared_ptr<TcpSocket> TcpSocket::Accept()
 {
-    const auto& aClientSocket = myImpl->Accept();
-    return std::make_shared<TcpSocket> (aClientSocket);
+    const auto& aClientSocket = internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Accept();
+    return std::make_shared <TcpSocket> (aClientSocket);
 }
 
 std::shared_ptr<TcpSocket> TcpSocket::Accept (sockaddr_in& theSenderInfo)
 {
-    const auto& aClientSocket = myImpl->Accept (theSenderInfo);
+    const auto& aClientSocket =  internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Accept (theSenderInfo);
     return std::make_shared<TcpSocket> (aClientSocket);
 }
 
 bool TcpSocket::Connect (const sockaddr_in& theServerInfo)
 {
-    return myImpl->Connect (theServerInfo);
+    return  internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Connect (theServerInfo);
 }
 
-bool TcpSocket::Read (const TcpSocket& theSocket, char* theData, std::uint64_t theMaxDataSize)
+bool TcpSocket::Read (char* theData, std::uint64_t theMaxDataSize)
 {
-    return myImpl->Read (theSocket.myImpl, theData, theMaxDataSize);
+    return internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Read (theData, theMaxDataSize);
 }
 
-bool TcpSocket::Write (const TcpSocket& theSocket, const char* theData, std::uint64_t theDataSize)
+bool TcpSocket::Write (const char* theData, std::uint64_t theDataSize)
 {
-    return myImpl->Write (theSocket.myImpl, theData, theDataSize);
+    return internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Write (theData, theDataSize);
 }
 
 void TcpSocket::Close()
 {
-    myImpl->Close();
+     internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Close();
 }
 

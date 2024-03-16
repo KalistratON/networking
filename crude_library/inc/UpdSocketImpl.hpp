@@ -11,8 +11,9 @@ namespace networking {
 namespace internal {
 
 class UpdSocketImpl : public AbstractSocketImpl {
+
 public:
-    UpdSocketImpl(SocketType theSocket);
+    UpdSocketImpl (SocketType theSocket);
     virtual bool Bind (const char* theReciverAddress, std::uint16_t thePort);
     
     bool ReadDatagram (char* theData, std::uint64_t theMaxDataSize);

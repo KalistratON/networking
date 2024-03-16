@@ -5,6 +5,7 @@
 
 #include <memory>
 
+// used in Windows and Linux
 struct sockaddr_in;
 
 namespace networking {
@@ -14,7 +15,8 @@ namespace internal {
     class TcpServerImpl;
 }
 
-class TcpSocket : AbstractSocket {
+class TcpSocket : public AbstractSocket {
+
 public:
     _NETWORKING_EXPORT TcpSocket (SocketType theSocket = -1);
 
@@ -27,17 +29,9 @@ public:
     _NETWORKING_EXPORT std::shared_ptr <TcpSocket> Accept();
     _NETWORKING_EXPORT std::shared_ptr <TcpSocket> Accept (sockaddr_in& theSenderInfo);
 
-    _NETWORKING_EXPORT bool Read  (const TcpSocket& theSocket, 
-                                   char* theData, std::uint64_t theMaxDataSize);
-    _NETWORKING_EXPORT bool Write (const TcpSocket& theSocket, 
-                                   const char* theData, std::uint64_t theDataSize);
+    _NETWORKING_EXPORT bool Read  (char* theData, std::uint64_t theMaxDataSize);
+    _NETWORKING_EXPORT bool Write (const char* theData, std::uint64_t theDataSize);
     _NETWORKING_EXPORT void Close();
-
-
-    friend internal::TcpServerImpl;
-
-private:
-    std::shared_ptr <internal::TcpSocketImpl> myImpl;
 };
 }
 

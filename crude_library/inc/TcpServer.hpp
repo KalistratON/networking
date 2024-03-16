@@ -3,6 +3,8 @@
 
 #include "TcpSocket.hpp"
 
+#include "../../event_system/inc/AbstractEventHandler.hpp"
+
 #include <cstdint>
 #include <memory>
 
@@ -20,7 +22,20 @@ public:
     _NETWORKING_EXPORT bool Listen();
     _NETWORKING_EXPORT void Close();
 
-    _NETWORKING_EXPORT const TcpSocket& NextPendingConnection();
+    _NETWORKING_EXPORT const std::shared_ptr<TcpSocket>& NextPendingConnection();
+
+    _NETWORKING_EXPORT void 
+    RegisterConnectionHandler (const std::shared_ptr <event_system::AbstractEventHandler>& theHandler);
+    _NETWORKING_EXPORT void 
+    UnregisterConnectionHandler (const std::shared_ptr <event_system::AbstractEventHandler>& theHandler);
+
+    _NETWORKING_EXPORT void 
+    RegisterMsgHandler (const std::shared_ptr <event_system::AbstractEventHandler>& theHandler);
+    _NETWORKING_EXPORT void 
+    UnregisterMsgHandler (const std::shared_ptr <event_system::AbstractEventHandler>& theHandler);
+    
+private:
+/*emit events*/
 
 private:
     std::shared_ptr<internal::TcpServerImpl> myImpl;

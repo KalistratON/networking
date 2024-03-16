@@ -2,6 +2,8 @@
 #define TCPSERVERIMPL_HPP
 
 #include "TcpSocket.hpp"
+#include "TcpConnectionEvent.hpp"
+#include "TcpMsgEvent.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -10,20 +12,26 @@ namespace networking {
 namespace internal {
     
 class TcpServerImpl {
-    using TcpSocketVecType = std::vector<TcpSocket>;
+    using TcpSocketVecType = std::vector<std::shared_ptr<TcpSocket>>;
+
 public:
     TcpServerImpl (const char* theReciverAddress, std::uint16_t thePort);
 
     bool Listen();
     void Close();
-    const TcpSocket& NextPendingConnection();
+    const std::shared_ptr<TcpSocket>& NextPendingConnection();
 
 private:
     void MultiplexingProcessing();
 
 private:
     TcpSocketVecType myClientSockets;
-    TcpSocket myMasterSocket;
+    std::shared_ptr<TcpSocket> myMasterSocket;
+
+/*events section*/
+public:
+    static TcpConnectionEvent myTcpConnectionEvent;
+    static TcpMsgEvent myTcpMsgEvent;
 };
 
 }
