@@ -29,7 +29,7 @@ public:
     _NETWORKING_EXPORT std::shared_ptr <TcpSocket> Accept();
     _NETWORKING_EXPORT std::shared_ptr <TcpSocket> Accept (sockaddr_in& theSenderInfo);
 
-    _NETWORKING_EXPORT bool Read  (char* theData, std::uint64_t theMaxDataSize);
+    _NETWORKING_EXPORT int Read  (char* theData, std::uint64_t theMaxDataSize);
     _NETWORKING_EXPORT bool Write (const char* theData, std::uint64_t theDataSize);
     _NETWORKING_EXPORT void Close();
 };

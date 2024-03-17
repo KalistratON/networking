@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/epoll.h>
 #endif
 
 #include <iostream>
@@ -74,15 +75,16 @@ void internal::TcpServerImpl::MultiplexingProcessing()
     int EPOLL = epoll_create1(0);
     epoll_event aMasterEvent;
 
-    aMasterEvent.data.fd = myMasterSocket.myImpl->mySocket;
+    aMasterEvent.data.fd = myMasterSocket->GetSocket();
     aMasterEvent.events = EPOLLIN;
-    epoll_ctl (EPOLL, EPOLL_CTL_ADD,  myMasterSocket.myImpl->mySocket, &aMasterEvent);
+    epoll_ctl (EPOLL, EPOLL_CTL_ADD,  myMasterSocket->GetSocket(), &aMasterEvent);
 
 
-    std::cout << "Socket : " << myMasterSocket.myImpl->mySocket << std::endl;
+    std::cout << "Socket : " << myMasterSocket->GetSocket() << std::endl;
 
     while (true) {
         epoll_event events [aMaxConnectedClients];
+
         int N = epoll_wait (EPOLL, events, aMaxConnectedClients, -1);
         // std::cout << "After wait" << std::endl;
         if (N == -1) {
@@ -92,24 +94,52 @@ void internal::TcpServerImpl::MultiplexingProcessing()
         }
         
         for (size_t i = 0; i < N; ++i) {
-            if (events[i].data.fd == myMasterSocket.myImpl->mySocket) {
-                const auto& aClientSocket = myMasterSocket.Accept();
-                std::cout << N << " : socket : " << aClientSocket->myImpl->mySocket << std::endl;
+
+            if (events[i].data.fd == myMasterSocket->GetSocket()) {
+                const auto& aClientSocket = myMasterSocket->Accept();
+                std::cout << N << " : socket : " << aClientSocket->GetSocket() << std::endl;
                 epoll_event aClientEvent;
-                aClientEvent.data.fd = aClientSocket->myImpl->mySocket;
+                aClientEvent.data.fd = aClientSocket->GetSocket();
                 aClientEvent.events = EPOLLIN;
-                epoll_ctl (EPOLL, EPOLL_CTL_ADD,  aClientSocket->myImpl->mySocket, &aClientEvent);
+
+                myClientSockets.push_back (aClientSocket);
+                
+                if (epoll_ctl (EPOLL, EPOLL_CTL_ADD,  aClientSocket->GetSocket(), &aClientEvent) == -1) {
+                    perror("epoll_ctl: listen_sock");
+                    exit(EXIT_FAILURE);
+                }
 
                 {
                     myTcpConnectionEvent = TcpConnectionEvent (aClientSocket);
                     myTcpConnectionEvent();
+                    
+                    std::cout << "Event connection was emit" << std::endl;
                 }
 
             } else {
+
                 // processing of income messages;
                 {
-                    myTcpMsgEvent = TcpMsgEvent (myClientSockets[i]);
-                    myTcpMsgEvent();
+                    char aData [100];
+                    int aReadReturned = myClientSockets.at(i)->Read (aData, 100);
+                    if (aReadReturned > 0) {
+                        
+                        std::cout << "Message | " << aData << std::endl;
+
+                        myTcpMsgEvent = TcpMsgEvent (myClientSockets[i]);
+                        myTcpMsgEvent();
+
+                        std::cout << "Event msg was emit" << std::endl;
+                    } else if (aReadReturned == 0 && errno != EAGAIN) {
+                    
+                        std::cout << "Close" << std::endl;
+
+                        myTcpMsgEvent = TcpMsgEvent (myClientSockets[i]);
+                        myTcpMsgEvent();
+
+                        std::cout << "Event msg was emit" << std::endl;
+                        epoll_ctl (EPOLL, EPOLL_CTL_DEL,  myClientSockets[i]->GetSocket(), NULL);
+                    }
                 }
             }
         }

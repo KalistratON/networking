@@ -84,7 +84,11 @@ bool internal::UpdSocketImpl::ReadDatagram (char* theData, std::uint64_t theMaxD
 bool internal::UpdSocketImpl::ReadDatagram (char* theData, std::uint64_t theMaxDataSize, 
                                             sockaddr_in& theSenderInfo)
 {
+#ifdef _WIN32
     int aSenderInfoSize = sizeof (theSenderInfo);
+#elif __linux__
+    socklen_t aSenderInfoSize = sizeof (theSenderInfo);
+#endif
     int aRecvReturn = recvfrom (mySocket, theData, static_cast <int> (theMaxDataSize), 0,
                                 (sockaddr*) (&theSenderInfo), &aSenderInfoSize);
 #ifdef _WIN32

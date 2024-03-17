@@ -91,7 +91,7 @@ class CustomUpdMsgHandle : public UpdMsgEventHandler
 int main()
 {
     const char* anAddress = "127.0.0.1";
-    size_t aPort = 1;
+    size_t aPort = 1234;
     TcpServer aServer (anAddress, aPort);
     
     // launch endless process

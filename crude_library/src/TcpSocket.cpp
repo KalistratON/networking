@@ -10,7 +10,9 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
+#include <unistd.h>
 #endif
 
 #include <iostream>
@@ -31,7 +33,11 @@ static int set_nonblock (SocketType fd)
     ﻿return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 #else
     flags = 1;
+#ifdef _WIN32
     return ioctlsocket (fd, FIONBIO, & flags);
+#elif __linux__
+    return ioctl(fd, FIONBIO, &flags);
+#endif
 #endif
 } 
 
@@ -117,7 +123,11 @@ SocketType internal::TcpSocketImpl::Accept()
 
 SocketType internal::TcpSocketImpl::Accept (sockaddr_in& theServerInfo)
 {
+#ifdef _WIN32
     int aSenderInfoSize = sizeof (theServerInfo);
+#elif __linux__
+    socklen_t aSenderInfoSize = sizeof (theServerInfo);
+#endif
     const auto& aClientSocket = accept (mySocket, (sockaddr*) &theServerInfo, &aSenderInfoSize);
 #ifdef _WIN32
     if (aClientSocket == INVALID_SOCKET) {
@@ -142,13 +152,25 @@ bool internal::TcpSocketImpl::Connect (const sockaddr_in& theServerInfo)
 
 void internal::TcpSocketImpl::Close()
 {
+#ifdef _WIN32
     int aSDReturn = shutdown (mySocket, SD_BOTH);
+#elif __linux__
+    int aSDReturn = shutdown (mySocket, SHUT_RDWR);
+#endif
+
 #ifdef _WIN32
     if (aSDReturn == SOCKET_ERROR) {
         ErrorProcessing (__LINE__, __FILE__);
     }
 #endif
+
+#ifdef _WIN32
     int aCSReturn = closesocket (mySocket);
+#elif __linux__
+
+    int aCSReturn = close (mySocket);
+#endif
+
 #ifdef _WIN32
     if (aCSReturn == SOCKET_ERROR) {
         ErrorProcessing (__LINE__, __FILE__);
@@ -156,7 +178,7 @@ void internal::TcpSocketImpl::Close()
 #endif
 }
 
-bool internal::TcpSocketImpl::Read (char* theData, std::uint64_t theMaxDataSize)
+int internal::TcpSocketImpl::Read (char* theData, std::uint64_t theMaxDataSize)
 {
     int aRecvReturn = recv (mySocket, theData, static_cast <int> (theMaxDataSize), 0);
 #ifdef _WIN32
@@ -166,12 +188,15 @@ bool internal::TcpSocketImpl::Read (char* theData, std::uint64_t theMaxDataSize)
             || aRecvReturn == WSAENOTCONN
             || aRecvReturn == WSAENOTSOCK
             || aRecvReturn == WSAETIMEDOUT) {
-            Close();
         }
         return false;
     }
+#elif __linux__
+    if (aRecvReturn == 0 && errno != EAGAIN) {
+        std::cout << "Shoot close()" << std::endl;
+    }
 #endif
-    return true;
+    return aRecvReturn;
 }
 
 bool internal::TcpSocketImpl::Write (const char* theData, std::uint64_t theDataSize)
@@ -217,7 +242,7 @@ bool TcpSocket::Connect (const sockaddr_in& theServerInfo)
     return  internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Connect (theServerInfo);
 }
 
-bool TcpSocket::Read (char* theData, std::uint64_t theMaxDataSize)
+int TcpSocket::Read (char* theData, std::uint64_t theMaxDataSize)
 {
     return internal::ToImpl<internal::TcpSocketImpl> (myImpl)->Read (theData, theMaxDataSize);
 }

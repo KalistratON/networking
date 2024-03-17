@@ -23,7 +23,7 @@ public:
     SocketType Accept ();
     SocketType Accept (sockaddr_in& theServerInfo);
     
-    bool Read  (char* theData, std::uint64_t theMaxDataSize);
+    int Read  (char* theData, std::uint64_t theMaxDataSize);
     bool Write (const char* theData, std::uint64_t theDataSize);
     void Close();
 };
