@@ -22,8 +22,6 @@ public:
     _NETWORKING_EXPORT bool Listen();
     _NETWORKING_EXPORT void Close();
 
-    _NETWORKING_EXPORT const std::shared_ptr<TcpSocket>& NextPendingConnection();
-
     _NETWORKING_EXPORT void 
     RegisterConnectionHandler (const std::shared_ptr <event_system::AbstractEventHandler>& theHandler);
     _NETWORKING_EXPORT void 

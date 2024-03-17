@@ -48,9 +48,10 @@ void internal::TcpServerImpl::MultiplexingProcessing()
         }
         for (size_t i = 0; i < aCurrentIndex; ++i) {
             if (aSET[i].revents & POLLIN) {
-                if (!i) {
+                SocketType aSocket = aSET[i].fd;
+                if (aSocket == myMasterSocket->GetSocket()) {
                     const auto& aClientSocket = myMasterSocket->Accept();
-                    myClientSockets.push_back (aClientSocket);
+                    myClientSockets.emplace (aClientSocket);
                     aSET[++aCurrentIndex].fd = aClientSocket->GetSocket();
                     aSET[0].events = POLLIN;
                     
@@ -60,7 +61,6 @@ void internal::TcpServerImpl::MultiplexingProcessing()
                     }
 
                 } else {
-
                     
                     {
                         myTcpMsgEvent = TcpMsgEvent (myClientSockets[i]);
@@ -94,15 +94,15 @@ void internal::TcpServerImpl::MultiplexingProcessing()
         }
         
         for (size_t i = 0; i < N; ++i) {
-
-            if (events[i].data.fd == myMasterSocket->GetSocket()) {
+            SocketType aSocket = events[i].data.fd;
+            if (aSocket == myMasterSocket->GetSocket()) {
                 const auto& aClientSocket = myMasterSocket->Accept();
                 std::cout << N << " : socket : " << aClientSocket->GetSocket() << std::endl;
                 epoll_event aClientEvent;
                 aClientEvent.data.fd = aClientSocket->GetSocket();
                 aClientEvent.events = EPOLLIN;
 
-                myClientSockets.push_back (aClientSocket);
+                myClientSockets.emplace (aClientSocket);
                 
                 if (epoll_ctl (EPOLL, EPOLL_CTL_ADD,  aClientSocket->GetSocket(), &aClientEvent) == -1) {
                     perror("epoll_ctl: listen_sock");
@@ -130,6 +130,7 @@ void internal::TcpServerImpl::MultiplexingProcessing()
                         myTcpMsgEvent();
 
                         std::cout << "Event msg was emit" << std::endl;
+
                     } else if (aReadReturned == 0 && errno != EAGAIN) {
                     
                         std::cout << "Close" << std::endl;
@@ -138,7 +139,9 @@ void internal::TcpServerImpl::MultiplexingProcessing()
                         myTcpMsgEvent();
 
                         std::cout << "Event msg was emit" << std::endl;
-                        epoll_ctl (EPOLL, EPOLL_CTL_DEL,  myClientSockets[i]->GetSocket(), NULL);
+                        const auto& aClientSocket = *myClientSockets.find (std::make_shared<TccpSocket>(aSocket))
+                        epoll_ctl (EPOLL, EPOLL_CTL_DEL,  aClientSocket->GetSocket(), NULL);
+                        myClientSockets.erase (std::make_shared<TccpSocket>(aSocket));
                     }
                 }
             }
@@ -190,11 +193,6 @@ bool internal::TcpServerImpl::Listen()
     return true;
 }
 
-const std::shared_ptr<TcpSocket>& internal::TcpServerImpl::NextPendingConnection()
-{
-    return myClientSockets.back();
-}
-
 TcpServer::TcpServer::TcpServer(const char* theReciverAddress, std::uint16_t thePort) :
     myImpl (std::make_shared<internal::TcpServerImpl> (theReciverAddress, thePort))
 {}
@@ -211,11 +209,6 @@ TcpServer::TcpServer::TcpServer(const char* theReciverAddress, std::uint16_t the
 bool TcpServer::TcpServer::Listen()
 {
    return myImpl->Listen();
-}
-
-const std::shared_ptr<TcpSocket>& TcpServer::TcpServer::NextPendingConnection()
-{
-    return myImpl->NextPendingConnection();
 }
 
 void TcpServer::TcpServer::Close()
