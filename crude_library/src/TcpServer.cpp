@@ -63,7 +63,7 @@ void internal::TcpServerImpl::MultiplexingProcessing()
                 } else {
                     
                     {
-                        myTcpMsgEvent = TcpMsgEvent (myClientSockets[i]);
+                        myTcpMsgEvent = TcpMsgEvent (*myClientSockets.find (std::make_shared<TcpSocket>(aSocket)));
                         myTcpMsgEvent();
                     }
                 }
@@ -139,7 +139,7 @@ void internal::TcpServerImpl::MultiplexingProcessing()
                         myTcpMsgEvent();
 
                         std::cout << "Event msg was emit" << std::endl;
-                        const auto& aClientSocket = *myClientSockets.find (std::make_shared<TccpSocket>(aSocket))
+                        const auto& aClientSocket = *myClientSockets.find (std::make_shared<TcpSocket>(aSocket))
                         epoll_ctl (EPOLL, EPOLL_CTL_DEL,  aClientSocket->GetSocket(), NULL);
                         myClientSockets.erase (std::make_shared<TccpSocket>(aSocket));
                     }
